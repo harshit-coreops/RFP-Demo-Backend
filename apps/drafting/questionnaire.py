@@ -19,6 +19,16 @@ _BASE_GOODS = [
     ("GCC", "general conditions of contract"),
 ]
 
+# Fixed-format wrapper sections (standard clause library; not RAG-generated).
+_FIXED_FRONT = [
+    ("Disclaimer", "disclaimer"),
+    ("Definitions", "definitions and abbreviations"),
+]
+_FIXED_BACK = [
+    ("Force Majeure", "force majeure"),
+    ("Dispute Resolution", "dispute resolution arbitration"),
+]
+
 
 def next_questions(draft) -> list[dict]:
     """Return the adaptive question set given current answers."""
@@ -65,4 +75,5 @@ def clause_plan(draft) -> list[tuple[str, str]]:
         plan.insert(5, ("Integrity Pact", "integrity pact high value transparency"))
     if draft.category == "Goods" and a.get("make_in_india", "Yes") != "Yes":
         plan = [p for p in plan if p[0] != "Make in India"]
-    return plan
+    # Wrap the variable core in the fixed-format boilerplate sections.
+    return _FIXED_FRONT + plan + _FIXED_BACK

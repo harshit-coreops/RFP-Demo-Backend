@@ -14,7 +14,8 @@ from apps.knowledge.retrieval import retrieve
 
 from apps.llm.gateway import gateway
 
-from .models import Clause
+from .boilerplate import compute_slots, fill, kind_for
+from .models import BoilerplateClause, Clause
 
 _FAITHFULNESS_MIN = 0.40  # min share of content terms supported by the sources
 
@@ -41,6 +42,59 @@ def _validate(draft_text: str, sources) -> tuple[bool, str]:
     if ratio >= _FAITHFULNESS_MIN:
         return True, f"Faithfulness check passed (source support {ratio:.0%})."
     return False, f"Low source support ({ratio:.0%}) — possible unsupported content."
+
+
+def generate_section(draft, clause_type: str, query: str, order: int = 0) -> Clause:
+    """Route a section to the right path based on its content type.
+
+    Fixed/parameterized sections are inserted verbatim from the standard clause
+    library (no retrieval, no model, no faithfulness gate); only genuinely
+    tender-specific sections go through grounded RAG generation. Falls back to
+    generation if a library entry is unexpectedly missing.
+    """
+    if kind_for(clause_type) in ("boilerplate", "parameterized"):
+        clause = _library_clause(draft, clause_type, order)
+        if clause is not None:
+            return clause
+    return generate_clause(draft, clause_type, query, order=order)
+
+
+def _library_clause(draft, clause_type: str, order: int) -> Clause | None:
+    bp = (BoilerplateClause.objects
+          .filter(clause_type=clause_type).order_by("-version").first())
+    if bp is None:
+        return None
+    text = fill(bp.body, compute_slots(draft)) if "{{" in bp.body else bp.body
+    citation = {"citation": bp.citation or "Standard pro-forma",
+                "kb_version": bp.version, "score": 1.0}
+    clause = Clause.objects.create(
+        draft=draft,
+        clause_type=clause_type,
+        text=text,
+        citations=[citation],
+        confidence="High",
+        confidence_score=1.0,
+        grounded=True,
+        rationale=(f"Inserted verbatim from the standard clause library "
+                   f"({bp.kind}; {bp.framework or 'standard'} pro-forma). "
+                   f"Fixed format — no model generation."),
+        model="clause-library",
+        prompt_version=bp.version,
+        order=order,
+    )
+    record(
+        draft, "generate",
+        clause_ref=clause_type,
+        clause_text=clause.text,
+        citation=citation["citation"],
+        kb_version=bp.version,
+        confidence="High",
+        confidence_score=1.0,
+        model="clause-library",
+        prompt_version=bp.version,
+        metadata={"source": "boilerplate", "kind": bp.kind, "grounded": True},
+    )
+    return clause
 
 
 def generate_clause(draft, clause_type: str, query: str, order: int = 0) -> Clause:

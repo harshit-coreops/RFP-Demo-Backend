@@ -8,7 +8,7 @@ class SuggestionSerializer(serializers.ModelSerializer):
         model = Suggestion
         fields = [
             "id", "target", "category", "severity", "issue", "original_text",
-            "suggested_text", "rationale", "citation", "origin", "status",
+            "span", "suggested_text", "rationale", "citation", "origin", "status",
             "final_text", "clause_id",
         ]
 

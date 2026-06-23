@@ -35,12 +35,20 @@ _REVIEW_SYSTEM = (
     "supplied procurement clauses for: ambiguity, restrictive/non-competitive "
     "criteria (GFR Rule 173), compliance risk, clarity and structure. For each "
     "issue propose improved phrasing aligned with standard drafting practice. "
-    "Do NOT invent rules. Respond ONLY as JSON: "
+    "Do NOT invent rules. For each issue, copy the exact problematic phrase "
+    "from the clause verbatim into \"span\" (leave it \"\" only when the issue "
+    "is that something is missing). Respond ONLY as JSON: "
     '{"suggestions": [{"target": str, "category": '
     '"Ambiguity|Restrictive|Compliance|Clarity|Structure|Missing", '
     '"severity": "Critical|High|Medium|Low|Info", "issue": str, '
-    '"suggested_text": str, "rationale": str}]}'
+    '"span": str, "suggested_text": str, "rationale": str}]}'
 )
+
+
+def _find_span(text: str, needle: str) -> str:
+    """Return the matched substring with its original casing (empty if absent)."""
+    i = text.lower().find(needle.lower())
+    return text[i:i + len(needle)] if i >= 0 else needle
 
 
 def _lint(target: str, text: str) -> list[dict]:
@@ -51,7 +59,7 @@ def _lint(target: str, text: str) -> list[dict]:
             out.append({
                 "target": target, "category": "Ambiguity", "severity": "Low",
                 "issue": f"Vague wording '{w}' reduces enforceability.",
-                "suggested_text": "", "origin": "lint",
+                "span": _find_span(text, w), "suggested_text": "", "origin": "lint",
                 "rationale": "Replace open-ended phrasing with specific, measurable terms.",
             })
             break
@@ -60,7 +68,7 @@ def _lint(target: str, text: str) -> list[dict]:
             out.append({
                 "target": target, "category": "Restrictive", "severity": "High",
                 "issue": f"Potentially restrictive term '{w}' may limit competition.",
-                "suggested_text": "", "origin": "lint",
+                "span": _find_span(text, w), "suggested_text": "", "origin": "lint",
                 "citation": "GFR 2017, Rule 173",
                 "rationale": "Eligibility/specs must be non-discriminatory (GFR Rule 173).",
             })
@@ -71,7 +79,7 @@ def _lint(target: str, text: str) -> list[dict]:
             out.append({
                 "target": target, "category": "Structure", "severity": "Low",
                 "issue": "Sentence exceeds 60 words; split for clarity.",
-                "suggested_text": "", "origin": "lint",
+                "span": sentence.strip(), "suggested_text": "", "origin": "lint",
                 "rationale": "Shorter sentences improve readability and reduce ambiguity.",
             })
             break
@@ -115,6 +123,7 @@ def _llm_review(items: list[tuple[str, str]]) -> list[dict]:
             "category": s.get("category", "Clarity"),
             "severity": s.get("severity", "Medium"),
             "issue": s.get("issue", ""),
+            "span": s.get("span", ""),
             "suggested_text": s.get("suggested_text", ""),
             "rationale": s.get("rationale", ""),
             "origin": "llm",
@@ -158,6 +167,7 @@ def run_review(session) -> int:
             severity=s.get("severity", "Medium"),
             issue=s.get("issue", ""),
             original_text=dict(items).get(s.get("target", ""), ""),
+            span=s.get("span", ""),
             suggested_text=s.get("suggested_text", ""),
             rationale=s.get("rationale", ""),
             citation=s.get("citation", ""),

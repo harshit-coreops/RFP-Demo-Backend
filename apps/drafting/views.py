@@ -6,7 +6,7 @@ from apps.accounts.identity import actor_role
 from apps.audit.services import record
 from apps.compliance.service import report_for
 
-from .generation import generate_clause
+from .generation import generate_section
 from .intake import classify_brief, extract_text
 from .models import Clause, Draft, Template
 from .questionnaire import clause_plan, next_questions
@@ -137,14 +137,14 @@ def generate(request, draft_id):
     if target:
         query = plan.get(target, request.data.get("query", target))
         order = len(plan) and list(plan).index(target) if target in plan else draft.clauses.count()
-        clause = generate_clause(draft, target, query, order=order)
+        clause = generate_section(draft, target, query, order=order)
         return Response(DraftSerializer(draft).data | {"generated": clause.id,
                                                        "compliance": _compliance_for(draft)})
 
     # generate_all
     draft.clauses.all().delete()
     for i, (ctype, query) in enumerate(clause_plan(draft)):
-        generate_clause(draft, ctype, query, order=i)
+        generate_section(draft, ctype, query, order=i)
     data = DraftSerializer(draft).data
     data["compliance"] = _compliance_for(draft)
     return Response(data)

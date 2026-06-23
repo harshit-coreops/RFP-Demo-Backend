@@ -59,11 +59,16 @@ def apply_to_draft(request, review_id):
         return Response({"applied": 0, "reason": "No linked draft (uploaded-text review)."})
     applied = 0
     for s in session.suggestions.filter(status__in=["accepted", "modified"]):
-        if not s.clause_id or not s.final_text:
+        if not s.final_text:
             continue
-        try:
-            clause = Clause.objects.get(id=s.clause_id, draft=session.draft)
-        except Clause.DoesNotExist:
+        clause = None
+        if s.clause_id:
+            clause = Clause.objects.filter(id=s.clause_id, draft=session.draft).first()
+        # Fall back to matching the suggestion's target against a clause heading
+        # for suggestions that were never linked at creation (e.g. LLM-origin).
+        if clause is None and s.target:
+            clause = session.draft.clauses.filter(clause_type=s.target).first()
+        if clause is None:
             continue
         clause.text = s.final_text
         clause.accepted = True

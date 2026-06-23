@@ -54,6 +54,39 @@ class Template(models.Model):
         return f"{self.name} ({self.key})"
 
 
+class BoilerplateClause(models.Model):
+    """Fixed / parameterized standard text — the reusable *format* of an RFP.
+
+    Unlike Clause, this is **not** RAG-generated. It is the standard
+    legal/procedural text that is the same across virtually every tender
+    (disclaimer, ITB, GCC, Integrity Pact, force majeure, arbitration, …).
+    Parameterized entries carry ``{{slot}}`` placeholders that are filled
+    deterministically from the Draft (e.g. EMD amount = 2% of value), so the
+    expensive grounded-generation path is reserved for genuinely
+    tender-specific prose (scope, eligibility, evaluation).
+    """
+
+    KIND_BOILERPLATE = "boilerplate"   # verbatim, no slots
+    KIND_PARAMETERIZED = "parameterized"  # verbatim text + computed {{slots}}
+    KINDS = [(KIND_BOILERPLATE, "boilerplate"), (KIND_PARAMETERIZED, "parameterized")]
+
+    clause_type = models.CharField(max_length=64)
+    kind = models.CharField(max_length=16, choices=KINDS, default=KIND_BOILERPLATE)
+    framework = models.CharField(max_length=32, blank=True)     # GFR, CVC, PPP-MII, …
+    citation = models.CharField(max_length=128, blank=True)     # standing source for audit
+    version = models.CharField(max_length=32, default="v2026.06")
+    heading = models.CharField(max_length=128, blank=True)
+    body = models.TextField()                                   # may contain {{slots}}
+    description = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = [("clause_type", "version")]
+        ordering = ["clause_type"]
+
+    def __str__(self):
+        return f"{self.clause_type} [{self.kind}] ({self.version})"
+
+
 class Clause(models.Model):
     draft = models.ForeignKey(Draft, on_delete=models.CASCADE, related_name="clauses")
     clause_type = models.CharField(max_length=64)

@@ -32,7 +32,8 @@ class Suggestion(models.Model):
     category = models.CharField(max_length=24)
     severity = models.CharField(max_length=16, default="Medium")
     issue = models.TextField()                        # what's wrong
-    original_text = models.TextField(blank=True)
+    original_text = models.TextField(blank=True)      # full clause/section text (context)
+    span = models.TextField(blank=True)               # exact problematic substring to highlight
     suggested_text = models.TextField(blank=True)
     rationale = models.TextField(blank=True)
     citation = models.CharField(max_length=256, blank=True)

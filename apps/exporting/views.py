@@ -1,11 +1,23 @@
 from django.http import HttpResponse
 
 from rest_framework.decorators import api_view
+from rest_framework.response import Response
 
 from apps.audit.services import record
 from apps.drafting.models import Draft
 
 from .builders import build_docx, build_pdf
+from .preview import build_preview
+
+
+@api_view(["GET"])
+def preview(request, draft_id):
+    """Read-only block preview of the composed document (editor canvas).
+
+    Same source as the DOCX/PDF export (``compose_document``), so what the
+    editor shows matches what is exported. No audit record — this is a read."""
+    draft = Draft.objects.get(id=draft_id)
+    return Response(build_preview(draft))
 
 
 @api_view(["GET"])

@@ -37,13 +37,18 @@ def _rule_based(spec: dict, brief: str) -> dict | None:
         instrument, conf = "RFE", "Medium"
         citations.append({"framework": "GFR 2017", "ref": "Rule 162", "note": "Empanelment / rate-contract route."})
     elif category == "goods":
-        # Goods: RFQ for simple low-value, RFP when installation/support involved.
-        if value >= LIMITED_TENDER_CEIL_CR and ("install" in low or "support" in low or "warranty" in low or value >= 1):
-            instrument, conf = "RFP", "High"
-            citations.append({"framework": "DoE Manual", "ref": "Goods §4", "note": "Goods with installation & support ⇒ RFP with technical + commercial split."})
-        else:
+        # Preference is RFP for Goods (technical + commercial split). Only a small,
+        # simple supply — below the ₹25 lakh advertised-tender ceiling AND with no
+        # installation / support / warranty scope — falls back to RFQ.
+        simple_supply = value < ADVERTISED_TENDER_CR and not any(
+            h in low for h in ("install", "support", "warranty", "commission",
+                               "integrat", "amc", "o&m", "maintenance"))
+        if simple_supply:
             instrument, conf = "RFQ", "Medium"
-            citations.append({"framework": "DoE Manual", "ref": "Goods §3", "note": "Standard goods supply ⇒ RFQ."})
+            citations.append({"framework": "DoE Manual", "ref": "Goods §3", "note": "Low-value simple supply ⇒ RFQ."})
+        else:
+            instrument, conf = "RFP", "High"
+            citations.append({"framework": "DoE Manual", "ref": "Goods §4", "note": "Goods procurement (installation / support scope) ⇒ RFP with technical + commercial split."})
     elif category in ("consulting", "non-consulting"):
         instrument, conf = "RFP", "High"
         citations.append({"framework": "DoE Manual", "ref": "Consultancy", "note": "Selection of consultants ⇒ RFP."})
