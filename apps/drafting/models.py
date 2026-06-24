@@ -20,6 +20,8 @@ class Draft(models.Model):
     locked = models.BooleanField(default=False)   # set on finalise-and-lock export
     version = models.IntegerField(default=3)       # display version (mock starts at v3)
     template_key = models.CharField(max_length=64, blank=True)  # applied template (Wizard step 2)
+    use_custom_sections = models.BooleanField(default=False)  # user hand-picked sections (Wizard step 2)
+    custom_sections = models.JSONField(default=list, blank=True)  # canonical section labels, when custom
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

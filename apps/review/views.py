@@ -50,6 +50,20 @@ def act(request, review_id, suggestion_id):
     return Response(ReviewSessionSerializer(s.session).data)
 
 
+def _apply_suggestion(s, text):
+    """Return the clause text with the suggestion applied.
+
+    Span-level rewrites (accept / edit-and-apply) carry a ``suggested_text``:
+    their ``final_text`` rewrites only ``span`` — the exact problematic
+    substring — so splice it in place and keep the rest of the clause intact.
+    Manual fixes carry no ``suggested_text``; their ``final_text`` is the whole
+    edited clause, so replace it outright. Fall back to a full replace when a
+    span can no longer be located (clause edited since review)."""
+    if s.suggested_text and s.span and s.span in text:
+        return text.replace(s.span, s.final_text, 1)
+    return s.final_text
+
+
 @api_view(["POST"])
 def apply_to_draft(request, review_id):
     """Apply accepted/modified suggestions that target a clause back into the
@@ -70,7 +84,7 @@ def apply_to_draft(request, review_id):
             clause = session.draft.clauses.filter(clause_type=s.target).first()
         if clause is None:
             continue
-        clause.text = s.final_text
+        clause.text = _apply_suggestion(s, clause.text)
         clause.accepted = True
         clause.save()
         record(

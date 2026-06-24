@@ -23,7 +23,8 @@ class DraftSerializer(serializers.ModelSerializer):
         fields = [
             "id", "title", "instrument", "category", "estimated_value_cr",
             "selection_method", "brief", "namespaces", "answers", "status",
-            "locked", "version", "template_key", "created_at", "updated_at", "clauses",
+            "locked", "version", "template_key", "use_custom_sections",
+            "custom_sections", "created_at", "updated_at", "clauses",
         ]
 
 

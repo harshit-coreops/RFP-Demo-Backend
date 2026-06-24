@@ -61,7 +61,19 @@ def next_questions(draft) -> list[dict]:
 
 
 def clause_plan(draft) -> list[tuple[str, str]]:
-    """Adaptive clause plan: which clauses to draft, given the answers."""
+    """Adaptive clause plan: which clauses to draft, given the answers.
+
+    If the user hand-picked a section set in Wizard step 2 (custom mode), that
+    explicit choice wins — generation honours exactly those sections, in the
+    canonical document order. We fall back to the adaptive logic when custom
+    mode is off or the picked set is (defensively) empty."""
+    from .sections import plan_for
+
+    if getattr(draft, "use_custom_sections", False):
+        plan = plan_for(draft.custom_sections)
+        if plan:
+            return plan
+
     a = draft.answers or {}
     plan = list(_BASE_GOODS) if draft.category == "Goods" else [
         ("NIT", "advertised tender notice inviting publication"),

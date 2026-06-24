@@ -11,6 +11,7 @@ from .intake import classify_brief, extract_text
 from .models import Clause, Draft, Template
 from .questionnaire import clause_plan, next_questions
 from .recommendation import recommend
+from .sections import catalogue, is_valid, normalize
 from .serializers import DraftListSerializer, DraftSerializer, TemplateSerializer
 
 
@@ -36,14 +37,31 @@ def drafts(request):
     return Response(DraftListSerializer(Draft.objects.order_by("-id"), many=True).data)
 
 
-@api_view(["GET", "PATCH"])
+@api_view(["GET", "PATCH", "DELETE"])
 def draft_detail(request, draft_id):
     draft = Draft.objects.get(id=draft_id)
+    if request.method == "DELETE":
+        draft.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
     if request.method == "PATCH":
         for f in ["title", "category", "estimated_value_cr", "selection_method",
                   "brief", "namespaces", "answers"]:
             if f in request.data:
                 setattr(draft, f, request.data[f])
+        # Custom section set (Wizard step 2): validate labels against the
+        # registry, drop unknowns/dupes, and store in canonical document order.
+        if "custom_sections" in request.data:
+            raw = request.data["custom_sections"] or []
+            if not isinstance(raw, list):
+                return Response({"detail": "custom_sections must be a list."},
+                                status=status.HTTP_400_BAD_REQUEST)
+            unknown = [s for s in raw if not is_valid(s)]
+            if unknown:
+                return Response({"detail": f"Unknown section(s): {unknown}"},
+                                status=status.HTTP_400_BAD_REQUEST)
+            draft.custom_sections = normalize(raw)
+        if "use_custom_sections" in request.data:
+            draft.use_custom_sections = bool(request.data["use_custom_sections"])
         draft.save()
     data = DraftSerializer(draft).data
     data["compliance"] = _compliance_for(draft)
@@ -90,6 +108,12 @@ def templates(request):
     return Response(TemplateSerializer(qs.order_by("-recommended", "name"), many=True).data)
 
 
+@api_view(["GET"])
+def sections(request):
+    """Wizard step 2 (custom) — the full catalogue of pickable sections."""
+    return Response({"sections": catalogue()})
+
+
 @api_view(["POST"])
 def apply_template(request, draft_id):
     """Wizard step 2 — apply a chosen template to the draft (recorded)."""
@@ -100,6 +124,7 @@ def apply_template(request, draft_id):
     draft.category = tpl.category
     if tpl.selection_method:
         draft.selection_method = tpl.selection_method
+    draft.use_custom_sections = False  # a real template overrides any custom pick
     draft.save()
     actor, role = actor_role(request)
     record(draft, "generate", clause_ref="template", actor=actor, role=role,
